@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT Music Playlist Extractor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <svg viewBox="0 0 24 24" width="40" height="40">
+                    <circle cx="12" cy="12" r="10" fill="#FF0000"/>
+                    <polygon points="10,8 16,12 10,16" fill="white"/>
+                </svg>
+                <h1>Playlist Extractor</h1>
+            </div>
+            <p class="tagline">Get individual links from any YouTube Music playlist</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <input
+                    type="text"
+                    id="playlistUrl"
+                    placeholder="Paste playlist URL here..."
+                    spellcheck="false"
+                >
+                <button id="extractBtn">Extract Links</button>
+            </div>
+
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <span>Fetching tracks...</span>
+            </div>
+
+            <div id="error" class="error hidden"></div>
+
+            <div id="results" class="results hidden">
+                <div class="results-header">
+                    <div class="playlist-info">
+                        <h2 id="playlistName"></h2>
+                        <span id="trackCount"></span>
+                    </div>
+                    <button id="copyAllBtn">Copy All Links</button>
+                </div>
+                <ul id="trackList"></ul>
+            </div>
+        </main>
+
+        <footer>
+            <p>Paste a YouTube Music playlist URL to extract all song links</p>
+        </footer>
+    </div>
+
+    <div id="toast" class="toast hidden">Copied to clipboard!</div>
+
+    <script src="app.js"></script>
+</body>
+</html>
