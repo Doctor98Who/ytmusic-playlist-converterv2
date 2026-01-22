@@ -29,7 +29,9 @@ function extractPlaylistId(input) {
 async function fetchFromYTMusic(playlistId) {
     return new Promise((resolve, reject) => {
         const scriptPath = path.join(__dirname, 'fetch_playlist.py');
-        const python = spawn('python', [scriptPath, playlistId]);
+        // Try python3 first (Linux), fallback to python (Windows)
+        const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+        const python = spawn(pythonCmd, [scriptPath, playlistId]);
 
         let stdout = '';
         let stderr = '';
@@ -44,8 +46,10 @@ async function fetchFromYTMusic(playlistId) {
 
         python.on('close', (code) => {
             if (code !== 0) {
-                console.log('[ytmusic] Python error:', stderr);
-                reject(new Error(stderr || 'Python script failed'));
+                console.error('[ytmusic] Python script failed with code:', code);
+                console.error('[ytmusic] stderr:', stderr);
+                console.error('[ytmusic] stdout:', stdout);
+                reject(new Error(stderr || stdout || 'Python script failed'));
                 return;
             }
 

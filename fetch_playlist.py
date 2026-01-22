@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 import sys
 import json
+import os
 from ytmusicapi import YTMusic
 
 def fetch_playlist(playlist_id):
     try:
-        ytmusic = YTMusic()
+        # Try authenticated mode first (if oauth.json exists), otherwise use base YTMusic
+        oauth_path = os.path.join(os.path.dirname(__file__), 'oauth.json')
+        if os.path.exists(oauth_path):
+            ytmusic = YTMusic(oauth_path)
+        else:
+            ytmusic = YTMusic()
+
         playlist = ytmusic.get_playlist(playlist_id, limit=None)
 
         tracks = []
@@ -38,8 +45,14 @@ def fetch_playlist(playlist_id):
         print(json.dumps(result))
 
     except Exception as e:
-        error_result = {'error': str(e)}
-        print(json.dumps(error_result))
+        import traceback
+        error_details = {
+            'error': str(e),
+            'type': type(e).__name__,
+            'traceback': traceback.format_exc()
+        }
+        print(json.dumps(error_details), file=sys.stderr)
+        print(json.dumps({'error': str(e)}))
         sys.exit(1)
 
 if __name__ == '__main__':
