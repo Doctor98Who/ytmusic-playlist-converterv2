@@ -1,20 +1,13 @@
 const express = require('express');
-const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
+const { spawn } = require('child_process');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
-const INVIDIOUS_INSTANCES = [
-    'https://inv.nadeko.net',
-    'https://vid.puffyan.us',
-    'https://invidious.nerdvpn.de',
-    'https://yt.artemislena.eu'
-];
 
 function generateShareId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -33,50 +26,55 @@ function extractPlaylistId(input) {
     return input;
 }
 
-async function fetchFromInvidious(playlistId) {
-    let lastError;
+async function fetchFromYTMusic(playlistId) {
+    return new Promise((resolve, reject) => {
+        const scriptPath = path.join(__dirname, 'fetch_playlist.py');
+        const python = spawn('python', [scriptPath, playlistId]);
 
-    for (const instance of INVIDIOUS_INSTANCES) {
-        try {
-            const url = `${instance}/api/v1/playlists/${playlistId}`;
-            console.log('[invidious] Trying:', url);
+        let stdout = '';
+        let stderr = '';
 
-            const resp = await axios.get(url, {
-                timeout: 20000,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'application/json'
-                }
-            });
+        python.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
 
-            const data = resp.data;
+        python.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
 
-            if (!data.videos || data.videos.length === 0) {
-                throw new Error('No videos found');
+        python.on('close', (code) => {
+            if (code !== 0) {
+                console.log('[ytmusic] Python error:', stderr);
+                reject(new Error(stderr || 'Python script failed'));
+                return;
             }
 
-            console.log('[invidious] Got', data.videos.length, 'tracks from', instance);
+            try {
+                const data = JSON.parse(stdout);
 
-            const tracks = data.videos.map(v => ({
-                title: v.title,
-                artist: v.author,
-                videoId: v.videoId,
-                link: `https://music.youtube.com/watch?v=${v.videoId}&si=${generateShareId()}`,
-                thumbnail: `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`
-            }));
+                if (data.error) {
+                    reject(new Error(data.error));
+                    return;
+                }
 
-            return {
-                name: data.title || data.subtitle || 'Playlist',
-                trackCount: tracks.length,
-                tracks
-            };
-        } catch (err) {
-            console.log('[invidious] Failed:', instance, '-', err.message);
-            lastError = err;
-        }
-    }
+                console.log('[ytmusic] Got', data.trackCount, 'tracks');
 
-    throw lastError || new Error('All instances failed');
+                // Add share links to tracks
+                data.tracks = data.tracks.map(track => ({
+                    ...track,
+                    link: `https://music.youtube.com/watch?v=${track.videoId}&si=${generateShareId()}`
+                }));
+
+                resolve(data);
+            } catch (parseErr) {
+                reject(new Error('Failed to parse playlist data'));
+            }
+        });
+
+        python.on('error', (err) => {
+            reject(new Error(`Failed to start Python: ${err.message}`));
+        });
+    });
 }
 
 app.post('/api/playlist', async (req, res) => {
@@ -91,7 +89,7 @@ app.post('/api/playlist', async (req, res) => {
 
         if (!playlistId) return res.status(400).json({ error: 'Invalid URL' });
 
-        const playlist = await fetchFromInvidious(playlistId);
+        const playlist = await fetchFromYTMusic(playlistId);
         res.json(playlist);
 
     } catch (err) {
